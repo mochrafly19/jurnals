@@ -1,9 +1,10 @@
 # Jurnals
 
-## Manual Setup
+### Manual Setup
 
-### Clone the Project
+1. **Clone the Project**
 
-1.```bash
+    ```bash
     git clone https://github.com/mochrafly19/jurnals jurnals
     ```
+
