@@ -15,10 +15,16 @@ class Jurnal extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'activity',
         'starts_at',
         'ends_at',
-        'activity',
     ];
+
+    protected $casts = [
+        'starts_at' => 'datetime',
+        'ends_at' => 'datetime',
+    ];
+
 
     /**
      * Get the formatted start date.

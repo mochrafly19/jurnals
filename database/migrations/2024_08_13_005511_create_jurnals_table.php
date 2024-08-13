@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('jurnals', function (Blueprint $table) {
             $table->id();
+            $table->string('activity');
+            $table->timestamp('starts_at');
+            $table->timestamp('ends_at');
             $table->timestamps();
-            $table->timestamp('starts_at')->nullable();
-            $table->timestamp('ends_at')->nullable();
-            $table->text('activity')->nullable();
         });
     }
 
