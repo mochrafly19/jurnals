@@ -4,7 +4,7 @@
 
 1. **Clone the Project**
     ```bash
-    git clone https://github.com/mochrafly19/jurnals.git jurnals
+    git clone https://github.com/mochrafly19/jurnals.git
     ```
 
 2. **Install Dependencies**
@@ -28,7 +28,7 @@
 
 6. **Configure `APP_URL` in `.env`**
     ```env
-    APP_URL=http://localhost:8000
+    APP_URL=http://jurnals.test/
     ```
 
 7. **Configure Database Connection in `.env`**
@@ -43,7 +43,7 @@
 
 8. **Run Database Migrations**
     ```bash
-    php artisan migrate
+    php artisan migrate --seed
     ```
 
 9. **Install Frontend Dependencies**
