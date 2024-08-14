@@ -185,6 +185,7 @@ return [
         /*
          * Package Service Providers...
          */
+        Spatie\QueryBuilder\QueryBuilderServiceProvider::class,
 
         /*
          * Application Service Providers...

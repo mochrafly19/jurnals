@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreJurnalRequest;
 use App\Http\Requests\UpdateJurnalRequest;
 use App\Models\Jurnal;
+use Spatie\QueryBuilder\QueryBuilder;
 use Illuminate\Http\Request;
 
 class JurnalController extends Controller
@@ -14,7 +15,10 @@ class JurnalController extends Controller
      */
     public function index()
     {
-        $jurnals = Jurnal::all();
+        $jurnals = QueryBuilder::for(Jurnal::class)
+        ->allowedSorts('starts_at','ends_at')
+        ->get();
+
         return view('jurnals.index', compact('jurnals'));
     }
 
