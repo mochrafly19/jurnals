@@ -31,10 +31,7 @@
                                         </a>
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        <a href="{{ route('jurnals.index', ['sort' => 'activity']) }}"
-                                            class="text-blue-500 hover:underline">
                                             {{ __('Activity') }}
-                                        </a>
                                     </th>
                                     <th scope="col" class="px-6 py-3">
                                         {{ __('Actions') }}
