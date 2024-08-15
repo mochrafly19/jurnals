@@ -1,0 +1,46 @@
+<x-datatable
+                            id="users-table"
+                            ajax="{{ route('roles.show', $role->id) }}"
+                            columns="[
+                                {
+                                    key: 'name',
+                                    label: 'Name',
+                                    render(value, row) {
+                                        return '<a href=/users/' + row.id + '>'+ value + '</a>';
+                                    }
+                                },
+                                {
+                                    key: 'email',
+                                    label: 'Email',
+                                },
+                                {
+                                    key: 'actions',
+                                    label: 'Actions',
+                                    width: '1',
+                                    render(value, row) {
+                                        if (row.id !== {{ auth()->user()->id }}) {
+                                                return `
+                                                    <a
+                                                        href={{ route('roles.revoke', ['role' => $role->id]) }}'
+                                                        class=text-error-500 whitespace-nowrap hover:no-underline hover:text-error-700
+                                                        title='{{ __('Revoke') }}'
+                                                        x-data
+                                                        @click.prevent=
+                                                            $dispatch('open-modal', 'confirm-role-revoke');
+                                                            $dispatch('set-form-revoke', {
+                                                                action: '{{ route('roles.revoke', ['role' => $role->id]) }}',
+                                                                name: '{{ $role->name }}',
+                                                                user: row.name,
+                                                                userId: row.id
+                                                            });
+                                                        
+                                                    >
+                                                        <i class='fad fa-fw fa-user-slash'></i> {{ __('Revoke') }}
+                                                    </a>
+                                                `;
+                                        }
+                                        return '';
+                                    }
+                                }
+                            ]"
+                        />   
