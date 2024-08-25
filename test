@@ -1,50 +1,100 @@
-<h4 class="font-medium text-gray-700">{{ __('Users with this Role') }}</h4>
-                        <x-datatable
-                        id="users-table"
-                        ajax="{{ route('roles.show', $role->id) }}"
-                        columns="[
-                            {
-                                key: 'name',
-                                label: 'Name',
-                                render(value, row) {
-                                    return `<a href=/users/${row.id}>${value}</a>`;
-                                }
-                            },
-                            {
-                                key: 'email',
-                                label: 'Email',
-                            },
-                            {
-                                key: 'actions',
-                                label: 'Actions',
-                                width: '1',
-                                render(value, row) {
-                                    let roleId = @json($role->id);
-                                    let authUserId = @json(auth()->user()->id);
-                                    if (row.id !== authUserId) {
-                                        let revokeUrl = `/roles/${roleId}/revoke/${row.id}`;
-                                        return `
-                                            <a
-                                                href="${revokeUrl}"
-                                                class="text-error-500 whitespace-nowrap hover:no-underline hover:text-error-700"
-                                                title="{{ __('Revoke') }}"
-                                                x-data
-                                                @click.prevent="
-                                                    $dispatch('open-modal', 'confirm-role-revoke');
-                                                    $dispatch('set-form-revoke', {
-                                                        action: '${revokeUrl}',
-                                                        name: '{{ $role->name }}',
-                                                        user: '${row.name}',
-                                                        userId: '${row.id}'
-                                                    });
-                                                "
-                                            >
-                                                <i class='fad fa-fw fa-user-slash'></i> {{ __('Revoke') }}
-                                            </a>
-                                        `;
-                                    }
-                                    return '';
-                                }
+<div {{ $wrapperAttributes() }}>
+    @if($label)
+        <label {{ $labelAttributes() }}>
+            {{ $label }}
+            @if ($required)
+                <span class="text-error-500">*</span>
+            @endif
+        </label>
+    @endif
+    <div class="relative" 
+         x-data="selectComponent('{{ $attributes->get('url') }}', {{ json_encode($options ?? []) }})" 
+         x-init="loadOptions(1, true)">
+         
+        <select {{ $selectAttributes() }} x-model="selectedValue" x-on:change="onChange">
+            @if($slot->isEmpty())
+                <template x-for="option in options" :key="option.id">
+                    <option :value="option.id" x-text="option.name" :selected="selectedValue == option.id"></option>
+                </template>
+                @foreach($options as $key => $option)
+                    <option value="{{ $key }}" 
+                        {{ in_array($key, old($parsed, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
+                        {{ $option }}
+                    </option>
+                @endforeach
+            @else
+                {{ $slot }}
+            @endif
+        </select>
+    </div>
+    @if($getError())
+        <p class="mt-2 text-sm text-red-600 dark:text-red-500">{{ $getError() }}</p>
+    @endif
+</div>
+
+<script>
+function selectComponent(url, initialOptions) {
+    return {
+        options: [
+            { id: '', name: '{{ $placeholder }}' },
+            ...initialOptions
+        ],
+        selectedValue: @json(old($name, $value)),
+        currentPage: 1,
+        lastPage: 1,
+
+        loadOptions(page = 1, ensureValueSelected = false) {
+            if (url) {
+                axios.get(url, { params: { page: page } })
+                    .then(response => {
+                        const responseData = response.data.data;
+                        this.currentPage = response.data.current_page;
+                        this.lastPage = response.data.last_page;
+                        
+                        this.options = [
+                            { id: '', name: '{{ $placeholder }}' }, 
+                            ...responseData
+                        ];
+
+                        if (this.currentPage < this.lastPage) {
+                            this.options.push({ id: 'next', name: '{{ __("Next") }}' });
+                        }
+
+                        if (this.currentPage > 1) {
+                            this.options.push({ id: 'previous', name: '{{ __("Previous") }}' });
+                        }
+
+                        if (ensureValueSelected) {
+                            const selectedExists = this.options.some(option => option.id == this.selectedValue);
+                            if (!selectedExists && this.currentPage < this.lastPage) {
+                                this.loadOptions(this.currentPage + 1, true);
                             }
-                        ]"
-                    />
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading options:', error);
+                    });
+            } else if (initialOptions.length) {
+                this.options = [
+                    { id: '', name: '{{ $placeholder }}' },
+                    ...initialOptions
+                ];
+            }
+        },
+
+        onChange(event) {
+            const selectedOption = event.target.value;
+
+            if (selectedOption === 'previous' && this.currentPage > 1) {
+                this.loadOptions(this.currentPage - 1);
+                this.selectedValue = '';
+            } else if (selectedOption === 'next' && this.currentPage < this.lastPage) {
+                this.loadOptions(this.currentPage + 1);
+                this.selectedValue = '';
+            } else {
+                this.selectedValue = selectedOption;
+            }
+        }
+    }
+}
+</script>
