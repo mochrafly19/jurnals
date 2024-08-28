@@ -7,15 +7,9 @@
             @endif
         </label>
     @endif
-    <div class="relative" 
-         x-data="selectComponent('{{ $attributes->get('url') }}', {{ json_encode($options ?? []) }})" 
-         x-init="loadOptions(1, true)">
-         
-        <select {{ $selectAttributes() }} x-model="selectedValue" x-on:change="onChange">
+    <div class="relative">
+        <select {{ $selectAttributes() }}>
             @if($slot->isEmpty())
-                <template x-for="option in options" :key="option.id">
-                    <option :value="option.id" x-text="option.name" :selected="selectedValue == option.id"></option>
-                </template>
                 @foreach($options as $key => $option)
                     <option value="{{ $key }}" 
                         {{ in_array($key, old($parsed, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
@@ -33,68 +27,104 @@
 </div>
 
 <script>
-function selectComponent(url, initialOptions = []) { // Ensure initialOptions is always an array
-    return {
-        options: [
-            { id: '', name: '{{ $placeholder }}' },
-            ...(Array.isArray(initialOptions) ? initialOptions : []) // Ensure it's iterable
-        ],
-        selectedValue: @json(old($name, $value)),
-        currentPage: 1,
-        lastPage: 1,
+    let currentPage = 1;
+    let totalPages = 1;
+    let urlBase = '';
 
-        loadOptions(page = 1, ensureValueSelected = false) {
-            if (url) {
-                axios.get(url, { params: { page: page } })
-                    .then(response => {
-                        const responseData = response.data.data;
-                        this.currentPage = response.data.current_page;
-                        this.lastPage = response.data.last_page;
-                        
-                        this.options = [
-                            { id: '', name: '{{ $placeholder }}' }, 
-                            ...responseData
-                        ];
+    function loadOptions(url, selectId, placeholder) {
+        urlBase = url; 
+        fetchOptions(url, selectId, placeholder);
+    }
 
-                        if (this.currentPage < this.lastPage) {
-                            this.options.push({ id: 'next', name: '{{ __("Next") }}' });
-                        }
+    function fetchOptions(url, selectId, placeholder) {
+        axios.get(url)  
+            .then(response => {
+                const select = document.getElementById(selectId);
+                
+                // Extract and format the data array from the response
+                const options = response.data.data;
+                totalPages = response.data.pagination.last_page;
+                currentPage = response.data.pagination.current_page;
 
-                        if (this.currentPage > 1) {
-                            this.options.push({ id: 'previous', name: '{{ __("Previous") }}' });
-                        }
+                // Clear existing options and repopulate using Choices.js
+                updateChoices(select, options, placeholder);
 
-                        if (ensureValueSelected) {
-                            const selectedExists = this.options.some(option => option.id == this.selectedValue);
-                            if (!selectedExists && this.currentPage < this.lastPage) {
-                                this.loadOptions(this.currentPage + 1, true);
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading options:', error);
-                    });
-            } else if (initialOptions.length) {
-                this.options = [
-                    { id: '', name: '{{ $placeholder }}' },
-                    ...(Array.isArray(initialOptions) ? initialOptions : [])
-                ];
+                updatePaginationControls(selectId);
+            })
+            .catch(error => {
+                console.error('Error loading options:', error);
+            });
+    }
+
+    function updateChoices(select, options, placeholder) {
+        if (select.choicesInstance) {
+            select.choicesInstance.clearStore();
+            select.choicesInstance.destroy();
+        }
+
+        // Initialize Choices.js if searchable
+        select.choicesInstance = new Choices(select, {
+            removeItemButton: true,
+            searchResultLimit: 5,
+            itemSelectText: '',
+            placeholderValue: placeholder || 'Select an option',
+            classNames: {
+                containerOuter: 'choices border-none focus:outline-none',
+                containerInner: 'choices__inner',
+                input: 'choices__input',
+                list: 'choices__list',
             }
-        },
+        });
 
-        onChange(event) {
-            const selectedOption = event.target.value;
+        select.choicesInstance.setChoices([
+            {
+                value: '',
+                label: placeholder || 'Select an option',
+                disabled: true,
+                selected: true
+            },
+            ...options.map(option => ({
+                value: option.value,
+                label: option.label
+            }))
+        ], 'value', 'label', false);
+    }
 
-            if (selectedOption === 'previous' && this.currentPage > 1) {
-                this.loadOptions(this.currentPage - 1);
-                this.selectedValue = '';
-            } else if (selectedOption === 'next' && this.currentPage < this.lastPage) {
-                this.loadOptions(this.currentPage + 1);
-                this.selectedValue = '';
-            } else {
-                this.selectedValue = selectedOption;
-            }
+    function updatePaginationControls(selectId) {
+        const select = document.getElementById(selectId);
+        const container = select.parentNode;
+
+        // Remove existing pagination controls
+        const existingControls = container.querySelector('.pagination-controls');
+        if (existingControls) {
+            existingControls.remove();
+        }
+
+        if (totalPages > 1) {
+            const paginationControls = document.createElement('div');
+            paginationControls.className = 'pagination-controls flex items-center justify-between mt-2';
+
+            const prevButton = createPaginationButton('Previous', () => {
+                if (currentPage > 1) fetchOptions(`${urlBase}?page=${currentPage - 1}`, selectId);
+            });
+
+            const nextButton = createPaginationButton('Next', () => {
+                if (currentPage < totalPages) fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId);
+            });
+
+            if (currentPage > 1) paginationControls.appendChild(prevButton);
+            if (currentPage < totalPages) paginationControls.appendChild(nextButton);
+
+            container.appendChild(paginationControls);
         }
     }
-}
+
+    function createPaginationButton(text, onClick) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = text;
+        button.className = 'pagination-button bg-blue-500 text-white px-4 py-2 rounded-lg shadow mr-6 hover:bg-blue-600';
+        button.onclick = onClick;
+        return button;
+    }
 </script>
