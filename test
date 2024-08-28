@@ -128,3 +128,141 @@
         return button;
     }
 </script>
+
+<div {{ $wrapperAttributes() }}>
+    @if($label)
+        <label {{ $labelAttributes() }}>
+            {{ $label }}
+            @if ($required)
+                <span class="text-error-500">*</span>
+            @endif
+        </label>
+    @endif
+    <div class="relative">
+        <select {{ $selectAttributes() }} id="{{ $id }}" data-url="{{ $dataUrl }}" data-old="{{ old($name, $value) }}">
+            @if($slot->isEmpty())
+                @foreach($options as $key => $option)
+                    <option value="{{ $key }}" 
+                        {{ in_array($key, old($name, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
+                        {{ $option }}
+                    </option>
+                @endforeach
+            @else
+                {{ $slot }}
+            @endif
+        </select>
+    </div>
+    @if($getError())
+        <p class="mt-2 text-sm text-red-600 dark:text-red-500">{{ $getError() }}</p>
+    @endif
+</div>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selects = document.querySelectorAll('select[data-url]');
+        selects.forEach(select => {
+            const url = select.getAttribute('data-url');
+            const oldValue = select.getAttribute('data-old');
+            loadOptions(url, select.id, 'Select an option', oldValue);
+        });
+    });
+
+    let currentPage = 1;
+    let totalPages = 1;
+    let urlBase = '';
+    let oldValue = '';
+
+    function loadOptions(url, selectId, placeholder, oldValueParam = '') {
+        urlBase = url;
+        oldValue = oldValueParam;
+        fetchOptions(url, selectId, placeholder);
+    }
+
+    function fetchOptions(url, selectId, placeholder) {
+        axios.get(url)
+            .then(response => {
+                const select = document.getElementById(selectId);
+                const options = response.data.data;
+                totalPages = response.data.pagination.last_page;
+                currentPage = response.data.pagination.current_page;
+
+                updateChoices(select, options, placeholder);
+                updatePaginationControls(selectId);
+            })
+            .catch(error => {
+                console.error('Error loading options:', error);
+                // Optionally display a message to the user here
+            });
+    }
+
+    function updateChoices(select, options, placeholder) {
+        if (select.choicesInstance) {
+            select.choicesInstance.clearStore();
+            select.choicesInstance.destroy();
+        }
+
+        select.choicesInstance = new Choices(select, {
+            removeItemButton: true,
+            searchResultLimit: 5,
+            itemSelectText: '',
+            placeholderValue: placeholder || 'Select an option',
+            classNames: {
+                containerOuter: 'choices border-none focus:outline-none',
+                containerInner: 'choices__inner',
+                input: 'choices__input',
+                list: 'choices__list',
+            }
+        });
+
+        select.choicesInstance.setChoices([
+            { value: '', label: placeholder || 'Select an option', disabled: true, selected: true },
+            ...options.map(option => ({ value: option.value, label: option.label }))
+        ], 'value', 'label', false);
+
+        // Set previously selected value if available
+        if (oldValue) {
+            const oldOption = options.find(option => option.value == oldValue);
+            if (oldOption) {
+                select.choicesInstance.setValue([{ value: oldOption.value, label: oldOption.label }]);
+            }
+        }
+    }
+
+    function updatePaginationControls(selectId) {
+        const select = document.getElementById(selectId);
+        const container = select.parentNode;
+
+        const existingControls = container.querySelector('.pagination-controls');
+        if (existingControls) {
+            existingControls.remove();
+        }
+
+        if (totalPages > 1) {
+            const paginationControls = document.createElement('div');
+            paginationControls.className = 'pagination-controls flex items-center justify-between mt-2';
+
+            const prevButton = createPaginationButton('Previous', () => {
+                if (currentPage > 1) fetchOptions(`${urlBase}?page=${currentPage - 1}`, selectId);
+            });
+
+            const nextButton = createPaginationButton('Next', () => {
+                if (currentPage < totalPages) fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId);
+            });
+
+            if (currentPage > 1) paginationControls.appendChild(prevButton);
+            if (currentPage < totalPages) paginationControls.appendChild(nextButton);
+
+            container.appendChild(paginationControls);
+        }
+    }
+
+    function createPaginationButton(text, onClick) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = text;
+        button.className = 'pagination-button bg-blue-500 text-white px-4 py-2 rounded-lg shadow mr-11 hover:bg-blue-600';
+        button.onclick = onClick;
+        return button;
+    }
+</script>
