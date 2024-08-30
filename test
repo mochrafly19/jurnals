@@ -295,3 +295,183 @@
         return button;
     }
 </script>
+
+protected function getXInit(): ?string
+    {
+        $selectedValue = json_encode(old($this->name, $this->value));
+
+        if ($this->searchable && $this->dataUrl) {
+            return "loadOptions('$this->dataUrl', '$this->id', '$this->placeholder', $selectedValue)";
+        }
+
+        if ($this->searchable) {
+            return "new Choices(document.getElementById('$this->id'), { 
+                removeItemButton: true, 
+                searchResultLimit: 5, 
+                itemSelectText: '', 
+                placeholderValue: '{$this->placeholder}', 
+                classNames: { containerOuter: 'choices border-none focus:outline-none' } 
+            })";
+        }
+
+        return null;
+    }
+
+<div {{ $wrapperAttributes() }}>
+    @if($label)
+        <label {{ $labelAttributes() }}>
+            {{ $label }}
+            @if ($required)
+                <span class="text-error-500">*</span>
+            @endif
+        </label>
+    @endif
+    <div class="relative">
+        <select {{ $selectAttributes() }}>
+            @if($slot->isEmpty())
+                @foreach($options as $key => $option)
+                    <option value="{{ $key }}" 
+                        {{ in_array($key, old($parsed, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
+                        {{ $option }}
+                    </option>
+                @endforeach
+            @else
+                {{ $slot }}
+            @endif
+        </select>
+    </div>
+    @if($getError())
+        <p class="mt-2 text-sm text-red-600 dark:text-red-500">{{ $getError() }}</p>
+    @endif
+</div>
+
+<script>
+   let currentPage = 1;
+let totalPages = 1;
+let urlBase = '';
+
+function loadOptions(url, selectId, placeholder, selectedValue = null) {
+    urlBase = url; // Set the base URL for pagination
+    fetchOptions(url, selectId, placeholder, selectedValue, true);
+}
+
+function fetchOptions(url, selectId, placeholder, selectedValue = null, isInitialLoad = false) {
+    const select = document.getElementById(selectId);
+
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.className = 'loading-spinner text-gray-500 mt-2';
+    loadingIndicator.textContent = 'Loading...';
+    select.parentNode.appendChild(loadingIndicator);
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            loadingIndicator.remove();
+
+            totalPages = data.pagination.last_page;
+            currentPage = data.pagination.current_page;
+
+            const options = data.data;
+
+            // Check if the selected value is in the current page
+            const foundValue = options.some(option => selectedValue && option.value === selectedValue);
+
+            // If this is the initial load and the value wasn't found, keep searching in the next pages
+            if (isInitialLoad && selectedValue && !foundValue && currentPage < totalPages) {
+                fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId, placeholder, selectedValue, true);
+            } else {
+                updateChoices(select, options, placeholder, selectedValue);
+                updatePaginationControls(selectId, placeholder, selectedValue);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading options:', error);
+            loadingIndicator.remove();
+        });
+}
+
+
+function updateChoices(select, options, placeholder, selectedValue = null) {
+    if (select.choicesInstance) {
+        select.choicesInstance.clearStore();
+        select.choicesInstance.destroy();
+    }
+
+    const selectedValuesArray = Array.isArray(selectedValue) ? selectedValue : [selectedValue];
+
+    const choicesOptions = options.map(option => ({
+        value: option.value,
+        label: option.label,
+        selected: selectedValue && selectedValuesArray.includes(option.value)
+    }));
+
+    // Re-initialize Choices with placeholder
+    select.choicesInstance = new Choices(select, {
+        removeItemButton: true,
+        searchResultLimit: 5,
+        itemSelectText: '',
+        placeholderValue: placeholder || 'Select an option',
+        classNames: {
+            containerOuter: 'choices border-none focus:outline-none',
+            containerInner: 'choices__inner',
+            input: 'choices__input',
+            list: 'choices__list',
+        },
+        // Include the placeholder as the first choice
+        choices: [
+            {
+                value: '',
+                label: placeholder || 'Select an option',
+                disabled: true,
+                selected: !selectedValue
+            },
+            ...choicesOptions
+        ]
+    });
+}
+
+function updatePaginationControls(selectId, placeholder, selectedValue) {
+    const select = document.getElementById(selectId);
+    const container = select.parentNode;
+
+    const existingControls = container.querySelector('.pagination-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+
+    if (totalPages > 1) {
+        const paginationControls = document.createElement('div');
+        paginationControls.className = 'pagination-controls flex items-center mt-2';
+
+        const prevButton = createPaginationButton('Previous', () => {
+            if (currentPage > 1) fetchOptions(`${urlBase}?page=${currentPage - 1}`, selectId, placeholder, selectedValue);
+        });
+
+        const nextButton = createPaginationButton('Next', () => {
+            if (currentPage < totalPages) fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId, placeholder, selectedValue);
+        });
+
+        if (currentPage > 1) paginationControls.appendChild(prevButton);
+        if (currentPage < totalPages) paginationControls.appendChild(nextButton);
+
+        container.appendChild(paginationControls);
+    }
+}
+
+
+function createPaginationButton(text, onClick, isDisabled = false) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = text;
+    button.className = 'pagination-button bg-indigo-500 text-white px-4 py-2 mt-1 rounded-lg shadow mr-1 hover:bg-indigo-600 disabled:bg-gray-300 disabled:cursor-not-allowed';
+    button.onclick = onClick;
+
+    if (isDisabled) {
+        button.disabled = true;
+    }
+
+    return button;
+}
+
+</script>
+
