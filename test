@@ -1,182 +1,67 @@
-Route::get('cart/{token}', [CartController::class, 'index'])->name('cart.index');
-Route::put('/cart/update', [CartController::class, 'update'])->name('cart.update');
-
-@extends('components.layouts.app')
-
-@section('content')
-<div class="py-12 px-4">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        @include('admin.layouts.notify')
-
-        <div class="flex flex-col lg:flex-row lg:space-x-4 mt-6 space-y-4 lg:space-y-0">
-            <div class="w-auto h-full bg-white overflow-hidden shadow-md rounded-lg">
-                <div class="mb-0">
-                    @if ($event->poster_url)
-                        <img src="{{ $event->poster_url }}" alt="{{ $event->title }} poster" class="w-auto">
-                    @else
-                        <p class="text-gray-500">No poster available for this event</p>
-                    @endif
-                </div>
-            </div>
-
-            <div class="w-full h-full">
-                <div class="px-6 py-4 mb-4 bg-white shadow-md rounded-lg">
-                    <h2 class="text-2xl font-semibold">{{ $event->title }}</h2>
-                    <p class="text-gray-700"><strong>At:</strong> {{ $event->venue ? $event->venue->name : '' }}</p>
-                    <p class="text-gray-500">{{ \Carbon\Carbon::parse($event->starts_at)->format('jS M Y g:i a') }} - {{ \Carbon\Carbon::parse($event->ends_at)->format('jS M Y g:i a') }}</p>
-                </div>
-
-                <form action="{{ route('cart.update') }}" method="POST">
-                    @csrf
-                    @method('PUT')
-
-                    <div class="px-6 py-4 mb-4 bg-white shadow-md rounded-lg">
-                        <h2 class="text-2xl font-semibold">Tickets</h2>
-                        <div class="space-y-4">
-                            @foreach($event->tickets as $ticket)
-                                @if($ticket->status !== 'sold out')
-                                    <div class="flex items-center justify-between max-w-full">
-                                        <div class="w-1/2">
-                                            <h1 class="text-lg font-semibold break-words">{{ $ticket->title }}</h1>
-                                            <div class="font-semibold break-words text-gray-500 mt-0">
-                                                <p>{{ $ticket->description }}</p>
-                                            </div>
-                                        </div>
-                                        <p class="text-lg font-semibold whitespace-nowrap text-right">(${{ $ticket->price }})</p>
-                                        <x-input wrapper-class="w-20" label-class="block" :label="__('')" name="tickets[{{ $ticket->id }}]" type="number" value="0" :min="0" :max="$ticket->qty" :$errors />
-                                    </div>
-                                @endif
-                            @endforeach
-                        </div>
-                        <div class="flex justify-between items-center mt-4">
-                            <a href="{{ route('home', ['ref' => url()->previous()]) }}" class="text-sm text-gray-600 hover:text-gray-900">
-                                <i class="fad fa-arrow-left mr-2"></i> Back
-                            </a>
-                            <x-button type="submit" variant="primary">Next</x-button>
-                        </div>
-                    </div>
-                </form>
-
-                @if($event->description)
-                    <div class="px-6 py-4 mb-4 bg-white shadow-md rounded-lg">
-                        {!! $event->description !!}
-                    </div>
-                @endif
-            </div>
-        </div>
-    </div>
-</div>
-@endsection
 
 
-@extends('components.layouts.app')
-
-@section('content')
-<div class="py-12 px-4">
-    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6 mt-10">
-        <h1 class="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
-
-        @if($cartItems->isEmpty())
-            <div class="bg-white shadow-lg rounded-lg p-6">
-                <p class="text-gray-500 text-lg">Your cart is empty.</p>
-            </div>
-        @else
-            <div class="bg-white shadow-lg rounded-lg p-6">
-                <div class="overflow-x-auto">
-                    <table class="min-w-full bg-white border border-gray-200 divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Ticket</th>
-                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Quantity</th>
-                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Price</th>
-                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @php $total = 0; @endphp
-                            @foreach($cartItems as $item)
-                                @php
-                                    $itemTotal = $item->ticket->price * $item->quantity;
-                                    $total += $itemTotal;
-                                @endphp
-                                <tr>
-                                    <td class="py-4 px-6 text-sm text-gray-900">{{ $item->ticket->title }}</td>
-                                    <td class="py-4 px-6 text-sm text-gray-500">{{ $item->quantity }}</td>
-                                    <td class="py-4 px-6 text-sm text-gray-500">${{ number_format($item->ticket->price, 2) }}</td>
-                                    <td class="py-4 px-6 text-sm text-gray-500">${{ number_format($itemTotal, 2) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="flex flex-col sm:flex-row justify-between items-center mt-6 space-y-4 sm:space-y-0">
-                    <p class="text-lg font-semibold text-gray-900">Total: ${{ number_format($total, 2) }}</p>
-                    <form action="{{ route('process', ['cart' => $cart->token]) }}" method="POST" class="flex-shrink-0">
-                        @csrf
-                        @method('PUT')
-                        <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-                            Proceed to Checkout
-                        </button>
-                    </form>                    
-                </div>                
-            </div>
-        @endif
-    </div>
-</div>
-@endsection
-
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Http\Requests\Checkout\StoreCustomerDetailsRequest;
-use App\Models\Cart;
-use App\Models\Order;
-use Stripe\Checkout\Session;
-use Stripe\Stripe;
-
-class CheckoutController extends Controller
-{
-    public function process(Cart $cart)
+ <form action="{{ route('checkout.process', ['cart' => $cart->token]) }}" method="POST">
+public function process(Request $request, Cart $cart)
     {
-        // Buat atau perbarui Order berdasarkan Cart
+        // Validate the incoming request
+        $request->validate([
+            'customer' => 'required|array',
+        ]);
+
+        // Generate a unique reference for the order
+        $reference = 'ORD-' . strtoupper(uniqid());
+
+        // Retrieve customer data from the request
+        $customerData = $request->input('customer');
+
+        // Create or update the Order based on the Cart
         $order = Order::updateOrCreate(
             ['cart_id' => $cart->id],
             [
-                'reference' => Order::generateReference(),
-                'customer' => $cart->customer,
+                'reference' => $reference,
+                'customer' => $customerData,
                 'total' => $cart->total(),
-                'status' => 'pending',
+                'status' => Order::STATUS_PENDING,
             ]
         );
 
-        // Tambahkan atau perbarui Order Items
+public function index()
+    {
+        // Retrieve or create the cart
+        $cart = Cart::firstOrCreateCart();
+        
+        // Retrieve the items associated with the cart
+        $cartItems = CartItem::all();
+    
+        return view('cart.index', compact('cart', 'cartItems'));
+    }
+    
+        // Add or update Order Items
         foreach ($cart->items as $item) {
             $order->items()->updateOrCreate(
                 ['ticket_id' => $item->ticket_id],
                 [
                     'quantity' => $item->quantity,
-                    'price' => $item->ticket->price, // Mengambil harga dari model Ticket
+                    'price' => $item->ticket->price, // Fetching price from the Ticket model
                 ]
             );
         }
 
         if ($order->total == 0) {
-            // Jika pesanan gratis, atur status ke 'completed' dan arahkan ke halaman detail pelanggan
-            $order->status = 'ok';
+            // If the order is free, set the status to 'completed' and redirect to customer details page
+            $order->status = Order::STATUS_OK;
             $order->save();
 
             return redirect()->route('checkout.customer-details', ['cart' => $cart->token]);
-        } else {    
-            // Jika pesanan berbayar, lanjutkan ke Stripe
-            $order->status = 'awaiting_payment';
+        } else {
+            // If the order is paid, proceed to Stripe
+            $order->status = Order::STATUS_AWAITING_PAYMENT;
             $order->save();
 
-            // Konfigurasi API Stripe
+            // Configure Stripe API
             Stripe::setApiKey(env('STRIPE_SECRET'));
 
-            // Buat sesi Stripe Checkout
+            // Create Stripe Checkout session
             $session = Session::create([
                 'payment_method_types' => ['card'],
                 'line_items' => [
@@ -186,7 +71,7 @@ class CheckoutController extends Controller
                             'product_data' => [
                                 'name' => 'Order #' . $order->id,
                             ],
-                            'unit_amount' => $order->total * 100, // Total dalam sen
+                            'unit_amount' => $order->total * 100, // Total in cents
                         ],
                         'quantity' => 1,
                     ],
@@ -196,114 +81,11 @@ class CheckoutController extends Controller
                 'cancel_url' => route('checkout.customer-details', ['cart' => $cart->token]),
             ]);
 
-            // Simpan Stripe Session ID di Order
+            // Save Stripe Session ID in Order
             $order->stripe_session_id = $session->id;
             $order->save();
 
-            // Arahkan ke Stripe Checkout URL
+            // Redirect to Stripe Checkout URL
             return redirect($session->url);
         }
     }
-
-    public function formCustomer(Cart $cart)
-    {
-    }
-
-    public function storeCustomer(StoreCustomerDetailsRequest $request, Cart $cart)
-    {
-    }
-
-    public function success(Cart $cart)
-    {
-    }
-}
-
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use App\Models\Cart;
-use App\Models\CartItem;
-
-class CartController extends Controller
-{
-    /**
-     * Display a listing of the resource.
-     */
-    public function index($token)
-    {
-        // Mengambil cart berdasarkan token
-        $cart = Cart::where('token', $token)->first();
-    
-        // Menangani kasus di mana tidak ada cart ditemukan
-        if (!$cart) {
-            return view('cart.index')->with('cartItems', collect())->with('cart', null);
-        }
-    
-        // Mengambil semua item keranjang untuk cart yang diambil
-        $cartItems = $cart->items; // Pastikan 'items' adalah relasi yang benar
-    
-        // Mengirim data ke view
-        return view('cart.index', compact('cart', 'cartItems'));
-    }
-    
-
-
-    
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request)
-    {
-        $validated = $request->validate([
-            'tickets.*' => 'integer|min:0',
-        ]);
-
-        $cart = Cart::firstOrCreateCart();
-        $cart->addOrUpdateItems($validated['tickets']);
-
-        return redirect()->route('cart.index', ['token' => $cart->token])->with('success', 'Tickets added to cart successfully.');
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
-}
