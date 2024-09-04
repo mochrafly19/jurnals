@@ -1,477 +1,309 @@
-<div {{ $wrapperAttributes() }}>
-    @if($label)
-        <label {{ $labelAttributes() }}>
-            {{ $label }}
-            @if ($required)
-                <span class="text-error-500">*</span>
-            @endif
-        </label>
-    @endif
-    <div class="relative">
-        <select {{ $selectAttributes() }}>
-            @if($slot->isEmpty())
-                @foreach($options as $key => $option)
-                    <option value="{{ $key }}" 
-                        {{ in_array($key, old($parsed, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
-                        {{ $option }}
-                    </option>
-                @endforeach
-            @else
-                {{ $slot }}
-            @endif
-        </select>
+Route::get('cart/{token}', [CartController::class, 'index'])->name('cart.index');
+Route::put('/cart/update', [CartController::class, 'update'])->name('cart.update');
+
+@extends('components.layouts.app')
+
+@section('content')
+<div class="py-12 px-4">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        @include('admin.layouts.notify')
+
+        <div class="flex flex-col lg:flex-row lg:space-x-4 mt-6 space-y-4 lg:space-y-0">
+            <div class="w-auto h-full bg-white overflow-hidden shadow-md rounded-lg">
+                <div class="mb-0">
+                    @if ($event->poster_url)
+                        <img src="{{ $event->poster_url }}" alt="{{ $event->title }} poster" class="w-auto">
+                    @else
+                        <p class="text-gray-500">No poster available for this event</p>
+                    @endif
+                </div>
+            </div>
+
+            <div class="w-full h-full">
+                <div class="px-6 py-4 mb-4 bg-white shadow-md rounded-lg">
+                    <h2 class="text-2xl font-semibold">{{ $event->title }}</h2>
+                    <p class="text-gray-700"><strong>At:</strong> {{ $event->venue ? $event->venue->name : '' }}</p>
+                    <p class="text-gray-500">{{ \Carbon\Carbon::parse($event->starts_at)->format('jS M Y g:i a') }} - {{ \Carbon\Carbon::parse($event->ends_at)->format('jS M Y g:i a') }}</p>
+                </div>
+
+                <form action="{{ route('cart.update') }}" method="POST">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="px-6 py-4 mb-4 bg-white shadow-md rounded-lg">
+                        <h2 class="text-2xl font-semibold">Tickets</h2>
+                        <div class="space-y-4">
+                            @foreach($event->tickets as $ticket)
+                                @if($ticket->status !== 'sold out')
+                                    <div class="flex items-center justify-between max-w-full">
+                                        <div class="w-1/2">
+                                            <h1 class="text-lg font-semibold break-words">{{ $ticket->title }}</h1>
+                                            <div class="font-semibold break-words text-gray-500 mt-0">
+                                                <p>{{ $ticket->description }}</p>
+                                            </div>
+                                        </div>
+                                        <p class="text-lg font-semibold whitespace-nowrap text-right">(${{ $ticket->price }})</p>
+                                        <x-input wrapper-class="w-20" label-class="block" :label="__('')" name="tickets[{{ $ticket->id }}]" type="number" value="0" :min="0" :max="$ticket->qty" :$errors />
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                        <div class="flex justify-between items-center mt-4">
+                            <a href="{{ route('home', ['ref' => url()->previous()]) }}" class="text-sm text-gray-600 hover:text-gray-900">
+                                <i class="fad fa-arrow-left mr-2"></i> Back
+                            </a>
+                            <x-button type="submit" variant="primary">Next</x-button>
+                        </div>
+                    </div>
+                </form>
+
+                @if($event->description)
+                    <div class="px-6 py-4 mb-4 bg-white shadow-md rounded-lg">
+                        {!! $event->description !!}
+                    </div>
+                @endif
+            </div>
+        </div>
     </div>
-    @if($getError())
-        <p class="mt-2 text-sm text-red-600 dark:text-red-500">{{ $getError() }}</p>
-    @endif
 </div>
+@endsection
 
-<script>
-    let currentPage = 1;
-    let totalPages = 1;
-    let urlBase = '';
-    
-    function loadOptions(url, selectId, placeholder, oldValueParam = '') {
-        urlBase = url; 
-        oldValue = oldValueParam;
-        fetchOptions(url, selectId, placeholder);
-    }
 
-    function fetchOptions(url, selectId, placeholder) {
-    const select = document.getElementById(selectId);
+@extends('components.layouts.app')
 
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.className = 'loading-spinner text-gray-500 mt-2';
-    loadingIndicator.textContent = 'Loading...';
-    select.parentNode.appendChild(loadingIndicator);
+@section('content')
+<div class="py-12 px-4">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6 mt-10">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Your Cart</h1>
 
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
-        .then(data => {
-            loadingIndicator.remove();
+        @if($cartItems->isEmpty())
+            <div class="bg-white shadow-lg rounded-lg p-6">
+                <p class="text-gray-500 text-lg">Your cart is empty.</p>
+            </div>
+        @else
+            <div class="bg-white shadow-lg rounded-lg p-6">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200 divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Ticket</th>
+                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Quantity</th>
+                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Price</th>
+                                <th class="py-3 px-6 text-left text-sm font-semibold text-gray-600">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @php $total = 0; @endphp
+                            @foreach($cartItems as $item)
+                                @php
+                                    $itemTotal = $item->ticket->price * $item->quantity;
+                                    $total += $itemTotal;
+                                @endphp
+                                <tr>
+                                    <td class="py-4 px-6 text-sm text-gray-900">{{ $item->ticket->title }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-500">{{ $item->quantity }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-500">${{ number_format($item->ticket->price, 2) }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-500">${{ number_format($itemTotal, 2) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
-            const options = data.data;
-            totalPages = data.pagination.last_page;
-            currentPage = data.pagination.current_page;
-
-            updateChoices(select, options, placeholder);
-
-            
-            updatePaginationControls(selectId);
-        })
-        .catch(error => {
-            console.error('Error loading options:', error);
-            loadingIndicator.remove();
-        });
-}
-
-    function updateChoices(select, options, placeholder) {
-        if (select.choicesInstance) {
-            select.choicesInstance.clearStore();
-            select.choicesInstance.destroy();
-        }
-
-        // Initialize Choices.js if searchable
-        select.choicesInstance = new Choices(select, {
-            removeItemButton: true,
-            searchResultLimit: 5,
-            itemSelectText: '',
-            placeholderValue: placeholder || 'Select an option',
-            classNames: {
-                containerOuter: 'choices border-none focus:outline-none',
-                containerInner: 'choices__inner',
-                input: 'choices__input',
-                list: 'choices__list',
-            }
-        });
-
-        select.choicesInstance.setChoices([
-            {
-                value: '',
-                label: placeholder || 'Select an option',
-                disabled: true,
-                selected: true
-            },
-            ...options.map(option => ({
-                value: option.value,
-                label: option.label
-            }))
-        ], 'value', 'label', false);
-    }
-
-    //Updates pagination controls based on current page and total pages.
-    function updatePaginationControls(selectId) {
-        const select = document.getElementById(selectId);
-        const container = select.parentNode;
-
-        const existingControls = container.querySelector('.pagination-controls');
-        if (existingControls) {
-            existingControls.remove();
-        }
-
-        if (totalPages > 1) {
-            const paginationControls = document.createElement('div');
-            paginationControls.className = 'pagination-controls flex items-center mt-2';
-
-            const prevButton = createPaginationButton('Previous', () => {
-                if (currentPage > 1) fetchOptions(`${urlBase}?page=${currentPage - 1}`, selectId);
-            });
-
-            const nextButton = createPaginationButton('Next', () => {
-                if (currentPage < totalPages) fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId);
-            });
-
-            if (currentPage > 1) paginationControls.appendChild(prevButton);
-            if (currentPage < totalPages) paginationControls.appendChild(nextButton);
-
-            container.appendChild(paginationControls);
-        }
-    }
-
-    function createPaginationButton(text, onClick, isDisabled = false) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = text;
-        button.className = 'pagination-button bg-indigo-500 text-white px-4 py-2 mt-1 rounded-lg shadow mr-1 hover:bg-indigo-600 disabled:bg-gray-300 disabled:cursor-not-allowed';
-        button.onclick = onClick;
-        return button;
-        if (isDisabled) {
-            button.disabled = true;
-        }
-        return button;
-     }
-</script>
-
-<div {{ $wrapperAttributes() }}>
-    @if($label)
-        <label {{ $labelAttributes() }}>
-            {{ $label }}
-            @if ($required)
-                <span class="text-error-500">*</span>
-            @endif
-        </label>
-    @endif
-    <div class="relative">
-        <select {{ $selectAttributes() }}>
-            @if($slot->isEmpty())
-                @foreach($options as $key => $option)
-                    <option value="{{ $key }}" 
-                        {{ in_array($key, old($parsed, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
-                        {{ $option }}
-                    </option>
-                @endforeach
-            @else
-                {{ $slot }}
-            @endif
-        </select>
+                <div class="flex flex-col sm:flex-row justify-between items-center mt-6 space-y-4 sm:space-y-0">
+                    <p class="text-lg font-semibold text-gray-900">Total: ${{ number_format($total, 2) }}</p>
+                    <form action="{{ route('process', ['cart' => $cart->token]) }}" method="POST" class="flex-shrink-0">
+                        @csrf
+                        @method('PUT')
+                        <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                            Proceed to Checkout
+                        </button>
+                    </form>                    
+                </div>                
+            </div>
+        @endif
     </div>
-    @if($getError())
-        <p class="mt-2 text-sm text-red-600 dark:text-red-500">{{ $getError() }}</p>
-    @endif
 </div>
+@endsection
 
-<script>
-    let currentPage = 1;
-    let totalPages = 1;
-    let urlBase = '';
-    
-   function loadOptions(url, selectId, placeholder) {
-        urlBase = url; 
-        fetchOptions(url, selectId, placeholder);
-    }
+<?php
 
-    function fetchOptions(url, selectId, placeholder) {
-        const select = document.getElementById(selectId);
+namespace App\Http\Controllers;
 
-        const loadingIndicator = document.createElement('div');
-        loadingIndicator.className = 'loading-spinner text-gray-500 mt-2';
-        loadingIndicator.textContent = 'Loading...';
-        select.parentNode.appendChild(loadingIndicator);
+use App\Http\Requests\Checkout\StoreCustomerDetailsRequest;
+use App\Models\Cart;
+use App\Models\Order;
+use Stripe\Checkout\Session;
+use Stripe\Stripe;
 
-        fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(data => {
-                loadingIndicator.remove();
-
-                // Extract and format the data array from the response
-                const options = data.data;
-                totalPages = data.pagination.last_page;
-                currentPage = data.pagination.current_page;
-
-                updateChoices(select, options, placeholder);
-                
-                updatePaginationControls(selectId);
-            })
-            .catch(error => {
-                console.error('Error loading options:', error);
-                loadingIndicator.remove();
-            });
-    }
-
-    function updateChoices(select, options, placeholder) {
-        if (select.choicesInstance) {
-            select.choicesInstance.clearStore();
-            select.choicesInstance.destroy();
-        }
-
-        // Initialize Choices.js if searchable
-        select.choicesInstance = new Choices(select, {
-            removeItemButton: true,
-            searchResultLimit: 5,
-            itemSelectText: '',
-            placeholderValue: placeholder || 'Select an option',
-            classNames: {
-                containerOuter: 'choices border-none focus:outline-none',
-                containerInner: 'choices__inner',
-                input: 'choices__input',
-                list: 'choices__list',
-            }
-        });
-
-        select.choicesInstance.setChoices([
-            {
-                value: '',
-                label: placeholder || 'Select an option',
-                disabled: true,
-                selected: true
-            },
-            ...options.map(option => ({
-                value: option.value,
-                label: option.label
-            }))
-        ], 'value', 'label', false);
-    }
-
-    //Updates pagination controls based on current page and total pages.
-    function updatePaginationControls(selectId) {
-        const select = document.getElementById(selectId);
-        const container = select.parentNode;
-
-        const existingControls = container.querySelector('.pagination-controls');
-        if (existingControls) {
-            existingControls.remove();
-        }
-
-        if (totalPages > 1) {
-            const paginationControls = document.createElement('div');
-            paginationControls.className = 'pagination-controls flex items-center mt-2';
-
-            const prevButton = createPaginationButton('Previous', () => {
-                if (currentPage > 1) fetchOptions(`${urlBase}?page=${currentPage - 1}`, selectId);
-            });
-
-            const nextButton = createPaginationButton('Next', () => {
-                if (currentPage < totalPages) fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId);
-            });
-
-            if (currentPage > 1) paginationControls.appendChild(prevButton);
-            if (currentPage < totalPages) paginationControls.appendChild(nextButton);
-
-            container.appendChild(paginationControls);
-        }
-    }
-
-    function createPaginationButton(text, onClick, isDisabled = false) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = text;
-        button.className = 'pagination-button bg-indigo-500 text-white px-4 py-2 mt-1 rounded-lg shadow mr-1 hover:bg-indigo-600 disabled:bg-gray-300 disabled:cursor-not-allowed';
-        button.onclick = onClick;
-
-        if (isDisabled) {
-            button.disabled = true;
-        }
-
-        return button;
-    }
-</script>
-
-protected function getXInit(): ?string
+class CheckoutController extends Controller
+{
+    public function process(Cart $cart)
     {
-        $selectedValue = json_encode(old($this->name, $this->value));
+        // Buat atau perbarui Order berdasarkan Cart
+        $order = Order::updateOrCreate(
+            ['cart_id' => $cart->id],
+            [
+                'reference' => Order::generateReference(),
+                'customer' => $cart->customer,
+                'total' => $cart->total(),
+                'status' => 'pending',
+            ]
+        );
 
-        if ($this->searchable && $this->dataUrl) {
-            return "loadOptions('$this->dataUrl', '$this->id', '$this->placeholder', $selectedValue)";
+        // Tambahkan atau perbarui Order Items
+        foreach ($cart->items as $item) {
+            $order->items()->updateOrCreate(
+                ['ticket_id' => $item->ticket_id],
+                [
+                    'quantity' => $item->quantity,
+                    'price' => $item->ticket->price, // Mengambil harga dari model Ticket
+                ]
+            );
         }
 
-        if ($this->searchable) {
-            return "new Choices(document.getElementById('$this->id'), { 
-                removeItemButton: true, 
-                searchResultLimit: 5, 
-                itemSelectText: '', 
-                placeholderValue: '{$this->placeholder}', 
-                classNames: { containerOuter: 'choices border-none focus:outline-none' } 
-            })";
+        if ($order->total == 0) {
+            // Jika pesanan gratis, atur status ke 'completed' dan arahkan ke halaman detail pelanggan
+            $order->status = 'ok';
+            $order->save();
+
+            return redirect()->route('checkout.customer-details', ['cart' => $cart->token]);
+        } else {    
+            // Jika pesanan berbayar, lanjutkan ke Stripe
+            $order->status = 'awaiting_payment';
+            $order->save();
+
+            // Konfigurasi API Stripe
+            Stripe::setApiKey(env('STRIPE_SECRET'));
+
+            // Buat sesi Stripe Checkout
+            $session = Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [
+                    [
+                        'price_data' => [
+                            'currency' => 'usd',
+                            'product_data' => [
+                                'name' => 'Order #' . $order->id,
+                            ],
+                            'unit_amount' => $order->total * 100, // Total dalam sen
+                        ],
+                        'quantity' => 1,
+                    ],
+                ],
+                'mode' => 'payment',
+                'success_url' => route('checkout.success', ['cart' => $cart->token]),
+                'cancel_url' => route('checkout.customer-details', ['cart' => $cart->token]),
+            ]);
+
+            // Simpan Stripe Session ID di Order
+            $order->stripe_session_id = $session->id;
+            $order->save();
+
+            // Arahkan ke Stripe Checkout URL
+            return redirect($session->url);
         }
-
-        return null;
     }
 
-<div {{ $wrapperAttributes() }}>
-    @if($label)
-        <label {{ $labelAttributes() }}>
-            {{ $label }}
-            @if ($required)
-                <span class="text-error-500">*</span>
-            @endif
-        </label>
-    @endif
-    <div class="relative">
-        <select {{ $selectAttributes() }}>
-            @if($slot->isEmpty())
-                @foreach($options as $key => $option)
-                    <option value="{{ $key }}" 
-                        {{ in_array($key, old($parsed, is_array($value) ? $value : [$value]) ?? []) ? 'selected' : '' }}>
-                        {{ $option }}
-                    </option>
-                @endforeach
-            @else
-                {{ $slot }}
-            @endif
-        </select>
-    </div>
-    @if($getError())
-        <p class="mt-2 text-sm text-red-600 dark:text-red-500">{{ $getError() }}</p>
-    @endif
-</div>
-
-<script>
-   let currentPage = 1;
-let totalPages = 1;
-let urlBase = '';
-
-function loadOptions(url, selectId, placeholder, selectedValue = null) {
-    urlBase = url; // Set the base URL for pagination
-    fetchOptions(url, selectId, placeholder, selectedValue, true);
-}
-
-function fetchOptions(url, selectId, placeholder, selectedValue = null, isInitialLoad = false) {
-    const select = document.getElementById(selectId);
-
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.className = 'loading-spinner text-gray-500 mt-2';
-    loadingIndicator.textContent = 'Loading...';
-    select.parentNode.appendChild(loadingIndicator);
-
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            loadingIndicator.remove();
-
-            totalPages = data.pagination.last_page;
-            currentPage = data.pagination.current_page;
-
-            const options = data.data;
-
-            // Check if the selected value is in the current page
-            const foundValue = options.some(option => selectedValue && option.value === selectedValue);
-
-            // If this is the initial load and the value wasn't found, keep searching in the next pages
-            if (isInitialLoad && selectedValue && !foundValue && currentPage < totalPages) {
-                fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId, placeholder, selectedValue, true);
-            } else {
-                updateChoices(select, options, placeholder, selectedValue);
-                updatePaginationControls(selectId, placeholder, selectedValue);
-            }
-        })
-        .catch(error => {
-            console.error('Error loading options:', error);
-            loadingIndicator.remove();
-        });
-}
-
-
-function updateChoices(select, options, placeholder, selectedValue = null) {
-    if (select.choicesInstance) {
-        select.choicesInstance.clearStore();
-        select.choicesInstance.destroy();
+    public function formCustomer(Cart $cart)
+    {
     }
 
-    const selectedValuesArray = Array.isArray(selectedValue) ? selectedValue : [selectedValue];
-
-    const choicesOptions = options.map(option => ({
-        value: option.value,
-        label: option.label,
-        selected: selectedValue && selectedValuesArray.includes(option.value)
-    }));
-
-    // Re-initialize Choices with placeholder
-    select.choicesInstance = new Choices(select, {
-        removeItemButton: true,
-        searchResultLimit: 5,
-        itemSelectText: '',
-        placeholderValue: placeholder || 'Select an option',
-        classNames: {
-            containerOuter: 'choices border-none focus:outline-none',
-            containerInner: 'choices__inner',
-            input: 'choices__input',
-            list: 'choices__list',
-        },
-        // Include the placeholder as the first choice
-        choices: [
-            {
-                value: '',
-                label: placeholder || 'Select an option',
-                disabled: true,
-                selected: !selectedValue
-            },
-            ...choicesOptions
-        ]
-    });
-}
-
-function updatePaginationControls(selectId, placeholder, selectedValue) {
-    const select = document.getElementById(selectId);
-    const container = select.parentNode;
-
-    const existingControls = container.querySelector('.pagination-controls');
-    if (existingControls) {
-        existingControls.remove();
+    public function storeCustomer(StoreCustomerDetailsRequest $request, Cart $cart)
+    {
     }
 
-    if (totalPages > 1) {
-        const paginationControls = document.createElement('div');
-        paginationControls.className = 'pagination-controls flex items-center mt-2';
-
-        const prevButton = createPaginationButton('Previous', () => {
-            if (currentPage > 1) fetchOptions(`${urlBase}?page=${currentPage - 1}`, selectId, placeholder, selectedValue);
-        });
-
-        const nextButton = createPaginationButton('Next', () => {
-            if (currentPage < totalPages) fetchOptions(`${urlBase}?page=${currentPage + 1}`, selectId, placeholder, selectedValue);
-        });
-
-        if (currentPage > 1) paginationControls.appendChild(prevButton);
-        if (currentPage < totalPages) paginationControls.appendChild(nextButton);
-
-        container.appendChild(paginationControls);
+    public function success(Cart $cart)
+    {
     }
 }
 
+<?php
 
-function createPaginationButton(text, onClick, isDisabled = false) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.textContent = text;
-    button.className = 'pagination-button bg-indigo-500 text-white px-4 py-2 mt-1 rounded-lg shadow mr-1 hover:bg-indigo-600 disabled:bg-gray-300 disabled:cursor-not-allowed';
-    button.onclick = onClick;
+namespace App\Http\Controllers;
 
-    if (isDisabled) {
-        button.disabled = true;
+use Illuminate\Http\Request;
+use App\Models\Cart;
+use App\Models\CartItem;
+
+class CartController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index($token)
+    {
+        // Mengambil cart berdasarkan token
+        $cart = Cart::where('token', $token)->first();
+    
+        // Menangani kasus di mana tidak ada cart ditemukan
+        if (!$cart) {
+            return view('cart.index')->with('cartItems', collect())->with('cart', null);
+        }
+    
+        // Mengambil semua item keranjang untuk cart yang diambil
+        $cartItems = $cart->items; // Pastikan 'items' adalah relasi yang benar
+    
+        // Mengirim data ke view
+        return view('cart.index', compact('cart', 'cartItems'));
+    }
+    
+
+
+    
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        //
     }
 
-    return button;
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        //
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        //
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        //
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request)
+    {
+        $validated = $request->validate([
+            'tickets.*' => 'integer|min:0',
+        ]);
+
+        $cart = Cart::firstOrCreateCart();
+        $cart->addOrUpdateItems($validated['tickets']);
+
+        return redirect()->route('cart.index', ['token' => $cart->token])->with('success', 'Tickets added to cart successfully.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        //
+    }
 }
-
-</script>
-
