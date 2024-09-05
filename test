@@ -111,3 +111,9 @@ public function index()
     
         return view('cart.index', compact('cart', 'cartItems'));
     }
+
+ ->withCount('tickets')
+[
+                    'key' => 'tickets_count',
+                    'label' => 'Ticket Quantity',
+                ],
