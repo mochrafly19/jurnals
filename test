@@ -1,13 +1,22 @@
+<form action="{{ route('checkout.process', ['cart' => $cart->token]) }}" method="POST">
 
+<?php
 
- <form action="{{ route('checkout.process', ['cart' => $cart->token]) }}" method="POST">
-public function process(Request $request, Cart $cart)
+namespace App\Http\Controllers;
+
+use App\Http\Requests\Checkout\StoreCustomerDetailsRequest;
+use App\Models\Cart;
+use App\Models\Order;
+use Stripe\Checkout\Session;
+use Stripe\Stripe;
+use Illuminate\Http\Request;
+use App\Http\Requests\UpdateOrderRequest;
+
+class CheckoutController extends Controller
+{
+   
+    public function process(UpdateOrderRequest $request, Cart $cart)
     {
-        // Validate the incoming request
-        $request->validate([
-            'customer' => 'required|array',
-        ]);
-
         // Generate a unique reference for the order
         $reference = 'ORD-' . strtoupper(uniqid());
 
@@ -24,7 +33,7 @@ public function process(Request $request, Cart $cart)
                 'status' => Order::STATUS_PENDING,
             ]
         );
-    
+
         // Add or update Order Items
         foreach ($cart->items as $item) {
             $order->items()->updateOrCreate(
@@ -71,13 +80,26 @@ public function process(Request $request, Cart $cart)
             ]);
 
             // Save Stripe Session ID in Order
-            $order->stripe_session_id = $session->id;
+            $order->checkout_session_id = $session->id;
             $order->save();
 
             // Redirect to Stripe Checkout URL
             return redirect($session->url);
         }
     }
+
+    public function formCustomer(Cart $cart)
+    {
+    }
+
+    public function storeCustomer(StoreCustomerDetailsRequest $request, Cart $cart)
+    {
+    }
+
+    public function success(Cart $cart)
+    {
+    }
+}
 
 public function index()
     {
