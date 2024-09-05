@@ -24,17 +24,6 @@ public function process(Request $request, Cart $cart)
                 'status' => Order::STATUS_PENDING,
             ]
         );
-
-public function index()
-    {
-        // Retrieve or create the cart
-        $cart = Cart::firstOrCreateCart();
-        
-        // Retrieve the items associated with the cart
-        $cartItems = CartItem::all();
-    
-        return view('cart.index', compact('cart', 'cartItems'));
-    }
     
         // Add or update Order Items
         foreach ($cart->items as $item) {
@@ -88,4 +77,15 @@ public function index()
             // Redirect to Stripe Checkout URL
             return redirect($session->url);
         }
+    }
+
+public function index()
+    {
+        // Retrieve or create the cart
+        $cart = Cart::firstOrCreateCart();
+        
+        // Retrieve the items associated with the cart
+        $cartItems = CartItem::all();
+    
+        return view('cart.index', compact('cart', 'cartItems'));
     }
