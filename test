@@ -1,119 +1,102 @@
-<form action="{{ route('checkout.process', ['cart' => $cart->token]) }}" method="POST">
-
 <?php
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\Checkout\StoreCustomerDetailsRequest;
-use App\Models\Cart;
-use App\Models\Order;
-use Stripe\Checkout\Session;
-use Stripe\Stripe;
 use Illuminate\Http\Request;
-use App\Http\Requests\UpdateOrderRequest;
+use App\Models\Order;
+use Stripe\Stripe;
+use Stripe\Webhook;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 
-class CheckoutController extends Controller
+class StripeWebhookController extends Controller
 {
-   
-    public function process(UpdateOrderRequest $request, Cart $cart)
+    public function handle(Request $request)
     {
-        // Generate a unique reference for the order
-        $reference = 'ORD-' . strtoupper(uniqid());
+        $payload = $request->getContent();
+        $sigHeader = $request->header('Stripe-Signature');
+        $endpointSecret = env('STRIPE_WEBHOOK_SECRET');
 
-        // Retrieve customer data from the request
-        $customerData = $request->input('customer');
-
-        // Create or update the Order based on the Cart
-        $order = Order::updateOrCreate(
-            ['cart_id' => $cart->id],
-            [
-                'reference' => $reference,
-                'customer' => $customerData,
-                'total' => $cart->total(),
-                'status' => Order::STATUS_PENDING,
-            ]
-        );
-
-        // Add or update Order Items
-        foreach ($cart->items as $item) {
-            $order->items()->updateOrCreate(
-                ['ticket_id' => $item->ticket_id],
-                [
-                    'quantity' => $item->quantity,
-                    'price' => $item->ticket->price, // Fetching price from the Ticket model
-                ]
+        try {
+            $event = Webhook::constructEvent(
+                $payload, $sigHeader, $endpointSecret
             );
+        } catch (\UnexpectedValueException $e) {
+            // Invalid payload
+            Log::error('Invalid payload', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Invalid payload'], Response::HTTP_BAD_REQUEST);
+        } catch (\Stripe\Exception\SignatureVerificationException $e) {
+            // Invalid signature
+            Log::error('Invalid signature', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Invalid signature'], Response::HTTP_BAD_REQUEST);
         }
 
-        if ($order->total == 0) {
-            // If the order is free, set the status to 'completed' and redirect to customer details page
+        // Handle the event
+        switch ($event->type) {
+            case 'checkout.session.completed':
+                $this->handlePaymentSuccess($event->data->object);
+                break;
+
+            case 'checkout.session.async_payment_failed':
+            case 'payment_intent.payment_failed':
+                $this->handlePaymentFailed($event->data->object);
+                break;
+
+            default:
+                Log::info('Received unknown event type ' . $event->type);
+                break;
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    protected function handlePaymentSuccess($session)
+    {
+        $order = Order::where('checkout_session_id', $session->id)->first();
+
+        if ($order) {
             $order->status = Order::STATUS_OK;
             $order->save();
-
-            return redirect()->route('checkout.customer-details', ['cart' => $cart->token]);
+            Log::info("Order {$order->id} marked as paid.");
         } else {
-            // If the order is paid, proceed to Stripe
-            $order->status = Order::STATUS_AWAITING_PAYMENT;
-            $order->save();
-
-            // Configure Stripe API
-            Stripe::setApiKey(env('STRIPE_SECRET'));
-
-            // Create Stripe Checkout session
-            $session = Session::create([
-                'payment_method_types' => ['card'],
-                'line_items' => [
-                    [
-                        'price_data' => [
-                            'currency' => 'usd',
-                            'product_data' => [
-                                'name' => 'Order #' . $order->id,
-                            ],
-                            'unit_amount' => $order->total * 100, // Total in cents
-                        ],
-                        'quantity' => 1,
-                    ],
-                ],
-                'mode' => 'payment',
-                'success_url' => route('checkout.success', ['cart' => $cart->token]),
-                'cancel_url' => route('checkout.customer-details', ['cart' => $cart->token]),
-            ]);
-
-            // Save Stripe Session ID in Order
-            $order->checkout_session_id = $session->id;
-            $order->save();
-
-            // Redirect to Stripe Checkout URL
-            return redirect($session->url);
+            Log::warning("Order not found for checkout session id {$session->id}");
         }
     }
 
-    public function formCustomer(Cart $cart)
+    protected function handlePaymentFailed($session)
     {
-    }
+        $order = Order::where('checkout_session_id', $session->id)->first();
 
-    public function storeCustomer(StoreCustomerDetailsRequest $request, Cart $cart)
-    {
-    }
-
-    public function success(Cart $cart)
-    {
+        if ($order) {
+            $order->status = Order::STATUS_PAYMENT_FAILED; 
+            $order->save();
+            Log::error("Order {$order->id} payment failed.");
+        } else {
+            Log::warning("Order not found for checkout session id {$session->id}");
+        }
     }
 }
 
-public function index()
-    {
-        // Retrieve or create the cart
-        $cart = Cart::firstOrCreateCart();
-        
-        // Retrieve the items associated with the cart
-        $cartItems = CartItem::all();
-    
-        return view('cart.index', compact('cart', 'cartItems'));
-    }
+<?php
 
- ->withCount('tickets')
-[
-                    'key' => 'tickets_count',
-                    'label' => 'Ticket Quantity',
-                ],
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\StripeWebhookController;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+Route::put('/cart/update', [CartController::class, 'update'])->name('cart.update');
+
+Route::resource('events', EventController::class);
+
+Route::prefix('checkout')->name('checkout.')->group(function () {
+    Route::put('{cart:token}', [CheckoutController::class, 'process'])->name('process');
+    Route::get('{cart:token}/customer-details', [CheckoutController::class, 'formCustomer'])->name('customer-details');
+    Route::post('{cart:token}/customer-details', [CheckoutController::class, 'storeCustomer']);
+    Route::get('{cart:token}/success', [CheckoutController::class, 'success'])->name('success');
+});
+
+Route::post('stripe/webhook', [StripeWebhookController::class, 'handle']);  
