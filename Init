@@ -1,0 +1,59 @@
+import 'package:flutter/material.dart';
+import 'package:latihan2/circle.dart';
+import 'package:latihan2/square.dart';
+
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> _posts = [
+      'List 1',
+      'List 2',
+      'List 3',
+      'List 4',
+      'List 5',
+      'List 6',
+      'List 7',
+    ];
+
+    final List<String> _stories = [
+      'Stories 1',
+      'Stories 2',
+      'Stories 3',
+      'Stories 4',
+      'Stories 5',
+      'Stories 6',
+      'Stories 7',
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Home Page'),
+      ),
+      body: Column(
+        children: [
+          Container(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _stories.length,
+              itemBuilder: (BuildContext context, int index) {
+                return Circle(child: _stories[index]);
+              },
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.vertical,
+              itemCount: _posts.length,
+              itemBuilder: (BuildContext context, int index) {
+                return Square(child: _posts[index]);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
