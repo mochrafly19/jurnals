@@ -1,139 +1,209 @@
-<?php
+import 'package:flutter/material.dart';
 
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use App\Models\Order;
-use Stripe\Stripe;
-use Stripe\Webhook;
-use Illuminate\Support\Facades\Log;
-use Symfony\Component\HttpFoundation\Response;
-
-class StripeWebhookController extends Controller
-{
-    public function handle(Request $request)
-    {
-        $payload = $request->getContent();
-        $sigHeader = $request->header('Stripe-Signature');
-        $endpointSecret = env('STRIPE_WEBHOOK_SECRET');
-
-
-        Log::info('Stripe payload', ['payload' => $payload]);
-        Log::info('Stripe signature header', ['sigHeader' => $sigHeader]);
-        Log::info('Stripe signature header', ['sigHeader' => $request->header('Stripe-Signature')]);
-
-        try {
-            $event = Webhook::constructEvent(
-                $payload, $sigHeader, $endpointSecret
-            );
-        } catch (\UnexpectedValueException $e) {
-            // Invalid payload
-            Log::error('Invalid payload', ['error' => $e->getMessage(), 'payload' => $payload]);
-            return response()->json(['error' => 'Invalid payload'], Response::HTTP_BAD_REQUEST);
-        } catch (\Stripe\Exception\SignatureVerificationException $e) {
-            // Invalid signature
-            Log::error('Invalid signature', ['error' => $e->getMessage(), 'signature_header' => $sigHeader]);
-            return response()->json(['error' => 'Invalid signature'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $eventType = $event->type;
-        
-        if ($eventType === 'checkout.session.completed' || $eventType === 'payment_intent.succeeded' || $eventType === 'charge.succeeded') {
-            $this->handlePaymentSuccess($event->data->object);
-        } elseif ($eventType === 'checkout.session.async_payment_failed' || $eventType === 'payment_intent.payment_failed') {
-            $this->handlePaymentFailed($event->data->object);
-        } else {
-            Log::info('Received unknown event type ' . $eventType);
-        }
-
-        return response()->json(['status' => 'success']);
-    }
-
-    protected function handlePaymentSuccess($session)
-    {
-        if (isset($session->id)) {
-            $order = Order::where('checkout_session_id', $session->id)->first();
-
-            if ($order) {
-                $customerDetails = [
-                    'name' => $session->customer_details->name ?? null, 
-                    'email' => $session->customer_details->email ?? null,
-                ];
-
-                $order->customer = $customerDetails; 
-
-                $order->status = Order::STATUS_OK;
-                $order->save();
-
-                Log::info("Order {$order->id} marked as paid with customer details.");
-            } else {
-                Log::warning("Order not found for checkout session id {$session->id}");
-            }
-        } else {
-            Log::error("No checkout session ID in the Stripe event payload.");
-        }
-    }   
-
-    protected function handlePaymentFailed($session)
-{
-    Log::info('Handling payment failed', ['session' => $session]);
-
-    if (isset($session->id)) {
-        $order = Order::where('checkout_session_id', $session->id)->first();
-
-        if ($order) {
-            $order->status = Order::STATUS_PAYMENT_FAILED;
-            $order->save();
-            Log::info("Order {$order->id} status updated to payment failed.");
-        } else {
-            Log::warning("Order not found for checkout session id {$session->id} during payment failure.");
-        }
-    } else {
-        Log::error("No checkout session ID in the failed payment event payload.");
-    }
+void main() {
+  runApp(MyApp());
 }
 
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: WalletScreen(),
+      theme: ThemeData(primarySwatch: Colors.blue),
+    );
+  }
 }
 
-<?php
+class WalletScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          CircleAvatar(
+            backgroundImage: AssetImage('assets/avatar.png'), // Replace with your image asset
+          ),
+          SizedBox(width: 16),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Wallet Balance Card
+            Container(
+              padding: EdgeInsets.all(20.0),
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "My Wallet",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    "\$1357.00",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "/usd",
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ActionButton(icon: Icons.arrow_downward, label: "Deposit"),
+                      ActionButton(icon: Icons.arrow_upward, label: "Withdraw"),
+                      ActionButton(icon: Icons.more_horiz, label: "More"),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20),
 
-namespace App\Http\Middleware;
+            // "For You" Section
+            Text(
+              "For You",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                FeatureButton(
+                  icon: Icons.book,
+                  label: "Learn crypto\nEarn crypto",
+                ),
+                FeatureButton(
+                  icon: Icons.timeline,
+                  label: "DCA Simulation",
+                ),
+                FeatureButton(
+                  icon: Icons.group,
+                  label: "Join Community",
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
 
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
-
-class VerifyCsrfToken extends Middleware
-{
-    /**
-     * The URIs that should be excluded from CSRF verification.
-     *
-     * @var array<int, string>
-     */
-    protected $except = [
-        'stripe/webhook'
-    ];
+            // Popular Cryptos
+            Text(
+              "Popular Cryptos",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            ListView(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              children: [
+                CryptoTile(name: "Bitcoin", code: "BTC/USD", price: "20174.45", change: "-3.15"),
+                CryptoTile(name: "Ethereum", code: "ETH/USD", price: "1071.81", change: "+2.45"),
+              ],
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0,
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: ""),
+          BottomNavigationBarItem(icon: Icon(Icons.link), label: ""),
+        ],
+      ),
+    );
+  }
 }
 
+// Reusable Widget for Action Button
+class ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-<?php
+  const ActionButton({required this.icon, required this.label});
 
-use App\Http\Controllers\CartController;
-use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\EventController;
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\StripeWebhookController;
-use Illuminate\Support\Facades\Route;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CircleAvatar(
+          backgroundColor: Colors.white,
+          child: Icon(icon, color: Colors.blue),
+        ),
+        SizedBox(height: 8),
+        Text(label, style: TextStyle(color: Colors.white)),
+      ],
+    );
+  }
+}
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
-Route::put('/cart/update', [CartController::class, 'update'])->name('cart.update');
+// Reusable Widget for Feature Button
+class FeatureButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-Route::resource('events', EventController::class);
+  const FeatureButton({required this.icon, required this.label});
 
-Route::prefix('checkout')->name('checkout.')->group(function () {
-    Route::put('{cart:token}', [CheckoutController::class, 'process'])->name('process');
-    Route::get('{cart:token}/customer-details', [CheckoutController::class, 'formCustomer'])->name('customer-details');
-    Route::post('{cart:token}/customer-details', [CheckoutController::class, 'storeCustomer']);
-    Route::get('{cart:token}/success', [CheckoutController::class, 'success'])->name('success');
-});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 30,
+          backgroundColor: Colors.grey[200],
+          child: Icon(icon, size: 30, color: Colors.blue),
+        ),
+        SizedBox(height: 8),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
 
-Route::post('stripe/webhook', [StripeWebhookController::class, 'handle']);  
+// Reusable Widget for Crypto Tile
+class CryptoTile extends StatelessWidget {
+  final String name;
+  final String code;
+  final String price;
+  final String change;
+
+  const CryptoTile({required this.name, required this.code, required this.price, required this.change});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: Colors.orange,
+        child: Text(name[0]),
+      ),
+      title: Text(name),
+      subtitle: Text(code),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text("\$$price", style: TextStyle(fontSize: 16)),
+          Text("$change%", style: TextStyle(color: change.startsWith('-') ? Colors.red : Colors.green)),
+        ],
+      ),
+    );
+  }
+}
