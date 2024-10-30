@@ -1,20 +1,8 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(MyApp());
-}
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: WalletScreen(),
-      theme: ThemeData(primarySwatch: Colors.blue),
-    );
-  }
-}
-
-class WalletScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,7 +11,7 @@ class WalletScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           CircleAvatar(
-            backgroundImage: AssetImage('assets/avatar.png'), // Replace with your image asset
+            backgroundImage: AssetImage('assets/avatar.png'), // Ganti dengan image asset milikmu
           ),
           SizedBox(width: 16),
         ],
@@ -33,69 +21,132 @@ class WalletScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Wallet Balance Card
-            Container(
-              padding: EdgeInsets.all(20.0),
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Kartu saldo dompet - Scrollable secara horizontal
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 children: [
-                  Text(
-                    "My Wallet",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "\$1357.00",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    padding: EdgeInsets.all(20.0),
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "My Wallet",
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "\$1357.00",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          "/usd",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            ActionButton(icon: Icons.arrow_downward, label: "Deposit"),
+                            ActionButton(icon: Icons.arrow_upward, label: "Withdraw"),
+                            ActionButton(icon: Icons.more_horiz, label: "More"),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  Text(
-                    "/usd",
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      ActionButton(icon: Icons.arrow_downward, label: "Deposit"),
-                      ActionButton(icon: Icons.arrow_upward, label: "Withdraw"),
-                      ActionButton(icon: Icons.more_horiz, label: "More"),
-                    ],
+                  SizedBox(width: 8),
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    padding: EdgeInsets.all(20.0),
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "My Wallet",
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          "\$1357.00",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          "/usd",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            ActionButton(icon: Icons.arrow_downward, label: "Deposit"),
+                            ActionButton(icon: Icons.arrow_upward, label: "Withdraw"),
+                            ActionButton(icon: Icons.more_horiz, label: "More"),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
             SizedBox(height: 20),
 
-            // "For You" Section
+            // Bagian "For You" - Scrollable secara horizontal
             Text(
               "For You",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                FeatureButton(
-                  icon: Icons.book,
-                  label: "Learn crypto\nEarn crypto",
-                ),
-                FeatureButton(
-                  icon: Icons.timeline,
-                  label: "DCA Simulation",
-                ),
-                FeatureButton(
-                  icon: Icons.group,
-                  label: "Join Community",
-                ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  FeatureButton(
+                    icon: Icons.book,
+                    label: "Learn crypto\nEarn crypto",
+                  ),
+                  SizedBox(width: 10),
+                  FeatureButton(
+                    icon: Icons.timeline,
+                    label: "DCA Simulation",
+                  ),
+                  SizedBox(width: 10),
+                  FeatureButton(
+                    icon: Icons.group,
+                    label: "Join Community",
+                  ),
+                  SizedBox(width: 10),
+                  FeatureButton(
+                    icon: Icons.group,
+                    label: "Join Community",
+                  ),
+                  SizedBox(width: 10),
+                  FeatureButton(
+                    icon: Icons.group,
+                    label: "Join Community",
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: 20),
 
@@ -105,13 +156,19 @@ class WalletScreen extends StatelessWidget {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 10),
-            ListView(
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              children: [
-                CryptoTile(name: "Bitcoin", code: "BTC/USD", price: "20174.45", change: "-3.15"),
-                CryptoTile(name: "Ethereum", code: "ETH/USD", price: "1071.81", change: "+2.45"),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: Column(
+                children: [
+                  CryptoTile(name: "Bitcoin", code: "BTC/USD", price: "20174.45", change: "-3.15"),
+                  CryptoTile(name: "Ethereum", code: "ETH/USD", price: "1071.81", change: "+2.45"),
+                  CryptoTile(name: "Ripple", code: "XRP/USD", price: "0.45", change: "+1.25"),
+                  CryptoTile(name: "Litecoin", code: "LTC/USD", price: "145.78", change: "-0.95"),CryptoTile(name: "Bitcoin", code: "BTC/USD", price: "20174.45", change: "-3.15"),
+                  CryptoTile(name: "Ethereum", code: "ETH/USD", price: "1071.81", change: "+2.45"),
+                  CryptoTile(name: "Ripple", code: "XRP/USD", price: "0.45", change: "+1.25"),
+                  CryptoTile(name: "Litecoin", code: "LTC/USD", price: "145.78", change: "-0.95"),
+                ],
+              ),
             ),
           ],
         ),
